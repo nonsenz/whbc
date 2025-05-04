@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wim Hof Breathing Counter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        .counter {
+            font-size: 4rem;
+            margin: 1rem 0;
+            color: #333;
+        }
+        .phase {
+            font-size: 1.5rem;
+            margin: 1rem 0;
+            color: #666;
+        }
+        .controls {
+            margin: 1rem 0;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 50px;
+        }
+        .controls button {
+            padding: 0.8rem 1.5rem;
+            font-size: 1.2rem;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            margin: 0.5rem;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.reset {
+            background-color: #f44336;
+        }
+        button.reset:hover {
+            background-color: #d32f2f;
+        }
+        .settings {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+        }
+        .settings label {
+            display: block;
+            margin: 0.5rem 0;
+        }
+        .settings input {
+            width: 60px;
+            padding: 0.3rem;
+            margin-left: 0.5rem;
+        }
+        .bottom-controls {
+            margin-top: 2rem;
+            text-align: center;
+        }
+        .bottom-controls button {
+            margin: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wim Hof Breathing Counter</h1>
+        <div class="phase" id="phaseText">Phase 1: Breathing</div>
+        <div class="counter" id="counter">30</div>
+        <div class="controls">
+            <button id="mainButton">Hold Complete</button>
+        </div>
+        <div class="settings">
+            <h3>Settings</h3>
+            <label>
+                Number of breaths (Phase 1):
+                <input type="number" id="breathCount" value="30" min="1">
+            </label>
+            <label>
+                Seconds per breath:
+                <input type="number" id="breathTime" value="1" min="0.1" step="0.1">
+            </label>
+            <label>
+                Number of rounds:
+                <input type="number" id="roundCount" value="3" min="1">
+            </label>
+        </div>
+        <div class="bottom-controls">
+            <button id="controlButton">Start</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPhase = 1;
+        let currentRound = 1;
+        let breathCount;
+        let breathTime;
+        let roundCount;
+        let timer;
+        let holdStartTime;
+        let isRunning = false;
+
+        const phaseText = document.getElementById('phaseText');
+        const counter = document.getElementById('counter');
+        const mainButton = document.getElementById('mainButton');
+        const controlButton = document.getElementById('controlButton');
+        const breathCountInput = document.getElementById('breathCount');
+        const breathTimeInput = document.getElementById('breathTime');
+        const roundCountInput = document.getElementById('roundCount');
+
+        // Create audio context and oscillator for beep sound
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let oscillator = null;
+
+        function updateSettings() {
+            breathCount = parseInt(breathCountInput.value);
+            breathTime = parseFloat(breathTimeInput.value);
+            roundCount = parseInt(roundCountInput.value);
+        }
+
+        function playPing() {
+            if (oscillator) {
+                oscillator.stop();
+            }
+            
+            oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        function startBreathing() {
+            if (isRunning) return;
+            isRunning = true;
+            updateSettings();
+            currentPhase = 1;
+            currentRound = 1;
+            mainButton.textContent = 'Hold Complete';
+            controlButton.textContent = 'Reset';
+            controlButton.classList.add('reset');
+            startPhase1();
+        }
+
+        function startPhase1() {
+            currentPhase = 1;
+            phaseText.textContent = `Phase 1: Breathing (Round ${currentRound}/${roundCount})`;
+            let count = breathCount;
+            counter.textContent = count;
+            mainButton.style.display = 'none';
+            playPing();
+
+            timer = setInterval(() => {
+                count--;
+                counter.textContent = count;
+                if (count <= 0) {
+                    clearInterval(timer);
+                    startPhase2();
+                }
+            }, breathTime * 1000);
+        }
+
+        function startPhase2() {
+            currentPhase = 2;
+            phaseText.textContent = `Phase 2: Hold Breath (Round ${currentRound}/${roundCount})`;
+            mainButton.style.display = 'block';
+            holdStartTime = Date.now();
+            playPing();
+            timer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - holdStartTime) / 1000);
+                counter.textContent = `${elapsed}s`;
+            }, 1000);
+        }
+
+        function startPhase3() {
+            currentPhase = 3;
+            phaseText.textContent = `Phase 3: Recovery Breath (Round ${currentRound}/${roundCount})`;
+            mainButton.style.display = 'none';
+            let count = 15;
+            counter.textContent = count;
+            playPing();
+
+            timer = setInterval(() => {
+                count--;
+                counter.textContent = count;
+                if (count <= 0) {
+                    clearInterval(timer);
+                    if (currentRound < roundCount) {
+                        currentRound++;
+                        currentPhase = 1;
+                        startPhase1();
+                    } else {
+                        reset();
+                    }
+                }
+            }, 1000);
+        }
+
+        function reset() {
+            clearInterval(timer);
+            isRunning = false;
+            currentPhase = 1;
+            currentRound = 1;
+            phaseText.textContent = 'Phase 1: Breathing';
+            updateSettings();
+            counter.textContent = breathCount;
+            mainButton.style.display = 'none';
+            controlButton.textContent = 'Start';
+            controlButton.classList.remove('reset');
+        }
+
+        mainButton.addEventListener('click', (e) => {
+            e.target.blur();
+            if (!isRunning) {
+                startBreathing();
+            } else if (currentPhase === 2) {
+                clearInterval(timer);
+                startPhase3();
+            }
+        });
+
+        controlButton.addEventListener('click', (e) => {
+            e.target.blur();
+            if (isRunning) {
+                reset();
+            } else {
+                startBreathing();
+            }
+        });
+
+        // Prevent space bar from triggering buttons
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                }
+            });
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                if (!isRunning) {
+                    startBreathing();
+                } else if (currentPhase === 2) {
+                    clearInterval(timer);
+                    startPhase3();
+                }
+            } else if (event.code === 'Escape') {
+                reset();
+            }
+        });
+
+        // Initialize
+        updateSettings();
+    </script>
+</body>
+</html> 
